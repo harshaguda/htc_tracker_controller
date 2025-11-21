@@ -111,6 +111,7 @@ void ComputeRelativePosition(CHtc_Vive_Tracker& vt,
         return;
     }
     
+    
     // Convert to transformation matrices
     Transform T_world_controller, T_world_tracker;
     PoseQuatToMatrix(controller_pose, controller_quat, T_world_controller);
@@ -222,6 +223,33 @@ private:
     void timer_callback() {
         // Update device poses
         vt_.Update();
+        
+        // // Poll for button events
+        while (vt_.EventPolling()) {
+            // Check if the controller has a button press
+            std::string button_name = vt_.GetLastButtonPressedString(controller_name_);
+            // std::string unbutton_name = vt_.GetLastButtonUnpressedString(controller_name_);
+            vr::EVRButtonId button_id = vt_.GetLastButtonPressedEnum(controller_name_);
+            
+            if (!button_name.empty()) {
+                RCLCPP_INFO(this->get_logger(), " PRESSED on %s!", button_name.c_str());
+                // RCLCPP_INFO(this->get_logger(), "UNPRESSED on %s!", unbutton_name.c_str());
+
+            }
+            // Check if trigger button was pressed (k_EButton_SteamVR_Trigger = 33)
+            // if (button_id == vr::k_EButton_SteamVR_Trigger) {
+            //     RCLCPP_INFO(this->get_logger(), "🎮 PRESSED on %s!", button_name.c_str());
+                
+            //     // Optional: trigger haptic feedback
+            //     // vt_.HapticPulse(controller_name_, 0, 1000);
+            // }
+            
+            // Print all button presses for debugging
+            // if (button_id != vr::k_EButton_Max) {
+            //     RCLCPP_INFO(this->get_logger(), "Button pressed: %s (ID: %d)", 
+            //                button_name.c_str(), static_cast<int>(button_id));
+            // }
+        }
         
         // Compute relative position
         double relative_position[3];
