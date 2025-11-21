@@ -76,6 +76,8 @@ install(TARGETS htc_tracker_pos_publisher
   DESTINATION lib/${PROJECT_NAME})
 
 # Add the new controller_6d_pose_publisher executable
+add_executable(controller_6d_pose_publisher_robot src/controller_6d_pose_publisher_robot.cpp)
+
 add_executable(controller_6d_pose_publisher src/controller_6d_pose_publisher.cpp)
 
 target_include_directories(controller_6d_pose_publisher PUBLIC
@@ -105,6 +107,27 @@ ament_target_dependencies(controller_6d_pose_publisher
 install(TARGETS controller_6d_pose_publisher
   DESTINATION lib/${PROJECT_NAME})
 
+target_include_directories(controller_6d_pose_publisher_robot PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${htc_vive_tracker_INCLUDE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../openvr/headers)
+target_compile_features(controller_6d_pose_publisher_robot PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+# Set RPATH to find the libraries at runtime
+set_target_properties(controller_6d_pose_publisher_robot PROPERTIES
+  INSTALL_RPATH "${htc_vive_tracker_LIB_DIR}:${OPENVR_LIB_DIR}"
+  BUILD_RPATH "${htc_vive_tracker_LIB_DIR}:${OPENVR_LIB_DIR}"
+  INSTALL_RPATH_USE_LINK_PATH TRUE)
+target_link_libraries(controller_6d_pose_publisher_robot
+  ${htc_vive_tracker_LIBRARY}
+  ${OPENVR_LIBRARY}
+  ${CMAKE_DL_LIBS})
+ament_target_dependencies(controller_6d_pose_publisher_robot
+  rclcpp
+  geometry_msgs
+  tf2_ros)
+install(TARGETS controller_6d_pose_publisher_robot
+  DESTINATION lib/${PROJECT_NAME})
 # Install launch files
 install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME})

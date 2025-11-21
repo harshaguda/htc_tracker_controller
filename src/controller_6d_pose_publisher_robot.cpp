@@ -6,7 +6,7 @@
 
 // ROS2 includes
 #include <rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2/LinearMath/Quaternion.h>
@@ -248,10 +248,10 @@ public:
                     controller_name_.c_str(), tracker_name_.c_str());
         
         // Create publishers
-        pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
+        pose_pub_ = this->create_publisher<geometry_msgs::msg::Twist>(
             "controller_relative_pose_6d", 10);
         
-        delta_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
+        delta_pose_pub_ = this->create_publisher<geometry_msgs::msg::Twist>(
             "delta_pose", 10);
         
         // Create static transform broadcaster
@@ -341,16 +341,14 @@ private:
         }
         
         // Create and publish current pose
-        auto pose_msg = geometry_msgs::msg::PoseStamped();
-        pose_msg.header.stamp = this->now();
-        pose_msg.header.frame_id = tracker_name_;
-        pose_msg.pose.position.x = current_pose.position[0];
-        pose_msg.pose.position.y = current_pose.position[1];
-        pose_msg.pose.position.z = current_pose.position[2];
-        pose_msg.pose.orientation.w = current_pose.quaternion[0];
-        pose_msg.pose.orientation.x = current_pose.quaternion[1];
-        pose_msg.pose.orientation.y = current_pose.quaternion[2];
-        pose_msg.pose.orientation.z = current_pose.quaternion[3];
+        auto pose_msg = geometry_msgs::msg::Twist();
+        
+        pose_msg.linear.x = current_pose.position[0];
+        pose_msg.linear.y = current_pose.position[1];
+        pose_msg.linear.z = current_pose.position[2];
+        // pose_msg.angular.x = current_pose.quaternion[1];
+        // pose_msg.angular.y = current_pose.quaternion[2];
+        // pose_msg.angular.z = current_pose.quaternion[3];
         pose_pub_->publish(pose_msg);
         
         // Delta pose tracking with 0.5 second intervals
@@ -370,16 +368,14 @@ private:
                     Pose6D delta_pose;
                     ComputeDeltaPose(current_pose, trigger_start_pose_, delta_pose);
                     
-                    auto delta_msg = geometry_msgs::msg::PoseStamped();
-                    delta_msg.header.stamp = this->now();
-                    delta_msg.header.frame_id = tracker_name_;
-                    delta_msg.pose.position.x = delta_pose.position[0];
-                    delta_msg.pose.position.y = delta_pose.position[1];
-                    delta_msg.pose.position.z = delta_pose.position[2];
-                    delta_msg.pose.orientation.w = delta_pose.quaternion[0];
-                    delta_msg.pose.orientation.x = delta_pose.quaternion[1];
-                    delta_msg.pose.orientation.y = delta_pose.quaternion[2];
-                    delta_msg.pose.orientation.z = delta_pose.quaternion[3];
+                    auto delta_msg = geometry_msgs::msg::Twist();
+                    delta_msg.linear.x = delta_pose.position[0];
+                    delta_msg.linear.y = delta_pose.position[1];
+                    delta_msg.linear.z = delta_pose.position[2];
+                    // delta_msg.angular.w = delta_pose.quaternion[0];
+                    // delta_msg.angular.x = delta_pose.quaternion[1];
+                    // delta_msg.angular.y = delta_pose.quaternion[2];
+                    // delta_msg.angular.z = delta_pose.quaternion[3];
                     delta_pose_pub_->publish(delta_msg);
                     
                     // Log delta information
@@ -424,8 +420,8 @@ private:
     std::string controller_name_;
     std::string tracker_name_;
     
-    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
-    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr delta_pose_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pose_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr delta_pose_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
     std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_;
     
