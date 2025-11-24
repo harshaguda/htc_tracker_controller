@@ -11,6 +11,8 @@
 #include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
+#include <sensor_msgs/msg/joint_state.hpp>
+#include <std_msgs/msg/bool.hpp>
 
 // Structure to hold 6D pose (position + orientation)
 struct Pose6D {
@@ -201,9 +203,12 @@ public:
           controller_name_("controller_1"),
           tracker_name_("tracker_1"),
           trigger_pressed_(false),
+          grip_pressed_(false),
           has_previous_pose_(false),
           trigger_start_pose_captured_(false),
-          delta_duration_(0.5)
+          delta_duration_(0.5),
+          gripper_width_(0.0),
+          gripper_closed_threshold_(0.01)
     {
         // Declare and get parameters
         this->declare_parameter("controller_name", "controller_1");
@@ -252,7 +257,15 @@ public:
             "controller_relative_pose_6d", 10);
         
         delta_pose_pub_ = this->create_publisher<geometry_msgs::msg::Twist>(
-            "delta_pose", 10);
+            "delta_pose", 1);
+        
+        gripper_command_pub_ = this->create_publisher<std_msgs::msg::Bool>(
+            "gripper_command", 10);
+        
+        // Create subscriber for gripper joint states
+        joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
+            "/franka_gripper/joint_states", 10,
+            std::bind(&Controller6DPosePublisher::joint_state_callback, this, std::placeholders::_1));
         
         // Create static transform broadcaster
         tf_static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
@@ -284,9 +297,21 @@ public:
         RCLCPP_INFO(this->get_logger(), "Topics:");
         RCLCPP_INFO(this->get_logger(), "  - /controller_relative_pose_6d (continuous)");
         RCLCPP_INFO(this->get_logger(), "  - /delta_pose (published every %.2f seconds while trigger held)", delta_duration_);
+        RCLCPP_INFO(this->get_logger(), "  - /gripper_command (published when grip button pressed)");
     }
 
 private:
+    void joint_state_callback(const sensor_msgs::msg::JointState::SharedPtr msg) {
+        // Find gripper finger joint and extract width
+        for (size_t i = 0; i < msg->name.size(); ++i) {
+            if (msg->name[i].find("finger") != std::string::npos) {
+                // Gripper width is 2x the finger joint position
+                gripper_width_ = msg->position[i] * 2.0;
+                break;
+            }
+        }
+    }
+    
     void timer_callback() {
         // Update device poses
         vt_.Update();
@@ -310,13 +335,18 @@ private:
             }
         }
         
-        // Check if trigger button is currently pressed
+        // Check if trigger and grip buttons are currently pressed
+        bool grip_currently_pressed = false;
         if (controller_index != vr::k_unTrackedDeviceIndexInvalid) {
             vr::VRControllerState_t controller_state;
             if (vr::VRSystem()->GetControllerState(controller_index, &controller_state, sizeof(controller_state))) {
                 // Check if trigger button is pressed (bit 33 = k_EButton_SteamVR_Trigger)
                 uint64_t trigger_mask = vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Trigger);
                 trigger_currently_pressed = (controller_state.ulButtonPressed & trigger_mask) != 0;
+                
+                // Check if grip button is pressed (bit 2 = k_EButton_Grip)
+                uint64_t grip_mask = vr::ButtonMaskFromId(vr::k_EButton_Grip);
+                grip_currently_pressed = (controller_state.ulButtonPressed & grip_mask) != 0;
             }
         }
         
@@ -330,6 +360,23 @@ private:
             trigger_pressed_ = false;
             trigger_start_pose_captured_ = false;
             RCLCPP_INFO(this->get_logger(), "🎮 Trigger released - Stopped delta pose tracking");
+        }
+        
+        // Detect grip button press and publish gripper command
+        if (grip_currently_pressed && !grip_pressed_) {
+            grip_pressed_ = true;
+            
+            // Determine if gripper is closed (width < threshold) or open
+            bool is_gripper_closed = (gripper_width_ < gripper_closed_threshold_);
+            
+            auto gripper_msg = std_msgs::msg::Bool();
+            gripper_msg.data = is_gripper_closed;  // true if closed, false if open
+            gripper_command_pub_->publish(gripper_msg);
+            
+            RCLCPP_INFO(this->get_logger(), "🤏 Grip button pressed - Gripper state: %s (width: %.4f m)",
+                       is_gripper_closed ? "CLOSED" : "OPEN", gripper_width_);
+        } else if (!grip_currently_pressed && grip_pressed_) {
+            grip_pressed_ = false;
         }
         
         // Compute current relative 6D pose
@@ -422,10 +469,13 @@ private:
     
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pose_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr delta_pose_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr gripper_command_pub_;
+    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
     std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_;
     
     bool trigger_pressed_;
+    bool grip_pressed_;
     bool has_previous_pose_;
     Pose6D previous_pose_;
     
@@ -434,6 +484,10 @@ private:
     Pose6D trigger_start_pose_;
     rclcpp::Time last_delta_publish_time_;
     double delta_duration_;
+    
+    // Gripper state tracking
+    double gripper_width_;
+    double gripper_closed_threshold_;
 };
 
 int main(int argc, char *argv[]) {

@@ -10,6 +10,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 # Find htc_vive_tracker library
 find_path(htc_vive_tracker_INCLUDE_DIR htc_vive_tracker.h 
@@ -125,7 +127,9 @@ target_link_libraries(controller_6d_pose_publisher_robot
 ament_target_dependencies(controller_6d_pose_publisher_robot
   rclcpp
   geometry_msgs
-  tf2_ros)
+  tf2_ros
+  sensor_msgs
+  std_msgs)
 install(TARGETS controller_6d_pose_publisher_robot
   DESTINATION lib/${PROJECT_NAME})
 # Install launch files
