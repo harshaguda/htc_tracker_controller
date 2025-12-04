@@ -56,7 +56,7 @@ public:
           trigger_pressed_(false),
           grip_pressed_(false),
           trigger_start_pose_captured_(false),
-          delta_duration_(0.2),
+          delta_duration_(0.1),
           gripper_width_(0.0),
           gripper_closed_threshold_(0.01)
     {
@@ -65,7 +65,7 @@ public:
         this->declare_parameter("publish_rate", 100.0);
         this->declare_parameter("verbose", false);
         this->declare_parameter("frame_id", "world");
-        this->declare_parameter("delta_duration", 0.2);
+        this->declare_parameter("delta_duration", 0.1);
         
         controller_name_ = this->get_parameter("controller_name").as_string();
         double publish_rate = this->get_parameter("publish_rate").as_double();
@@ -303,12 +303,12 @@ private:
                     Pose6D delta_pose;
                     ComputeDeltaPose(current_pose, trigger_start_pose_, delta_pose);
                     
-                    // Limit delta position magnitude to 0.04 meters
+                    // Limit delta position magnitude to 0.1 meters
                     double delta_magnitude = sqrt(delta_pose.position[0]*delta_pose.position[0] +
                                                  delta_pose.position[1]*delta_pose.position[1] +
                                                  delta_pose.position[2]*delta_pose.position[2]);
                     RCLCPP_INFO(this->get_logger(), "Computed delta magnitude: %.4f m", delta_magnitude);
-                    const double max_delta = 0.20;  // meters
+                    const double max_delta = 0.1;  // meters
                     if (delta_magnitude > max_delta) {
                         double scale_factor = max_delta / delta_magnitude;
                         delta_pose.position[0] *= scale_factor;
